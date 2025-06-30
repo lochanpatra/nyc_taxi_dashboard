@@ -11,14 +11,8 @@ A Streamlit-based interactive dashboard for analyzing NYC Yellow Taxi trip data 
 - Explore payment method distributions
 - Plot distance vs. fare correlations
 
-## 📁 Project Structure
+## 📁click me
 
-nyc_taxi_dashboard/
-├── app.py # Main Streamlit app
-├── data/
-│ ├── yellow_tripdata_part_1.csv
-│ ├── ... (split CSV parts)
-│ └── taxi_zone_lookup.csv
-├── requirements.txt
-└── .gitignore
+https://lochannyctrip.streamlit.app/
+
 
