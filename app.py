@@ -4,6 +4,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from datetime import datetime
 import glob
+import warnings
+
+warnings.filterwarnings("ignore")  # Suppress warnings
 
 # --- Page Setup ---
 st.set_page_config(layout="wide")
@@ -11,28 +14,40 @@ st.title("🚖 NYC Yellow Taxi Trip Analysis Dashboard")
 
 # --- Load Data ---
 @st.cache_data
-def load_trip_data_split(folder_path="data/", pattern="yellow_tripdata_part*.csv"):
-    all_files = glob.glob(folder_path + pattern)
-    if not all_files:
-        st.error(f"No files found with pattern {pattern} in folder {folder_path}")
-        st.stop()
+def load_trip_data(folder_path):
+    all_files = sorted(glob.glob(f"{folder_path}/yellow_tripdata_part_*.csv"))
     df_list = []
     for file in all_files:
-        temp_df = pd.read_csv(file, parse_dates=["tpep_pickup_datetime", "tpep_dropoff_datetime"])
+        temp_df = pd.read_csv(
+            file,
+            parse_dates=["tpep_pickup_datetime", "tpep_dropoff_datetime"],
+            low_memory=False
+        )
         df_list.append(temp_df)
     df = pd.concat(df_list, ignore_index=True)
+
+    # Add derived columns
     df["pickup_date"] = df["tpep_pickup_datetime"].dt.date
     df["pickup_hour"] = df["tpep_pickup_datetime"].dt.hour
     df["trip_duration_minutes"] = (df["tpep_dropoff_datetime"] - df["tpep_pickup_datetime"]).dt.total_seconds() / 60
     return df
 
 @st.cache_data
-def load_zone_lookup(path="data/taxi_zone_lookup.csv"):
+def load_zone_lookup(path):
     return pd.read_csv(path)
 
+# --- File Paths ---
+trip_data_folder = "data"
+zone_lookup_path = "data/taxi_zone_lookup.csv"
+
+# --- Load & Filter Data ---
 with st.spinner("Loading data..."):
-    df = load_trip_data_split()
-    zones = load_zone_lookup()
+    df = load_trip_data(trip_data_folder)
+    zones = load_zone_lookup(zone_lookup_path)
+
+# Optional: downsample for performance
+if st.sidebar.checkbox("🔽 Sample 10% of data (for speed)", value=True):
+    df = df.sample(frac=0.1, random_state=42)
 
 # --- Sidebar Filters ---
 st.sidebar.header("🛠️ Filters")
@@ -71,7 +86,7 @@ st.dataframe(pickup_counts)
 st.subheader("📊 Trips per Hour")
 hourly_trips = df_clean.groupby("pickup_hour").size().reset_index(name="Trip Count")
 fig1, ax1 = plt.subplots(figsize=(10, 4))
-sns.barplot(data=hourly_trips, x="pickup_hour", y="Trip Count", palette="viridis", ax=ax1)
+sns.barplot(data=hourly_trips, x="pickup_hour", y="Trip Count", hue="pickup_hour", palette="viridis", legend=False, ax=ax1)
 ax1.set_title("Trips by Hour")
 st.pyplot(fig1)
 
@@ -87,13 +102,19 @@ st.subheader("💳 Payment Type Distribution")
 pay_dist = df_clean["payment_type"].value_counts().reset_index()
 pay_dist.columns = ["Payment Type", "Trip Count"]
 fig3, ax3 = plt.subplots()
-sns.barplot(data=pay_dist, x="Payment Type", y="Trip Count", palette="pastel", ax=ax3)
+sns.barplot(data=pay_dist, x="Payment Type", y="Trip Count", hue="Payment Type", palette="pastel", legend=False, ax=ax3)
 ax3.set_title("Payment Type Counts")
 st.pyplot(fig3)
 
 st.subheader("📉 Distance vs Fare")
 df_scatter = df_clean[(df_clean["trip_distance"] < 50) & (df_clean["fare_amount"] < 200)]
 fig4, ax4 = plt.subplots(figsize=(10, 5))
-sns.scatterplot(data=df_scatter.sample(frac=0.02, random_state=1), x="trip_distance", y="fare_amount", alpha=0.3, ax=ax4)
+sns.scatterplot(
+    data=df_scatter.sample(frac=0.02, random_state=1),
+    x="trip_distance",
+    y="fare_amount",
+    alpha=0.3,
+    ax=ax4
+)
 ax4.set_title("Trip Distance vs Fare")
 st.pyplot(fig4)
